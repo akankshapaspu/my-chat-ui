@@ -12,7 +12,6 @@
     "react-dom": "latest",
     "axios": "latest",
     "next-auth": "latest",
-    "@next-auth/email": "latest",
     "nodemailer": "latest"
   }
 }
