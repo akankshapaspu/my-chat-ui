@@ -1,4 +1,3 @@
-// File: pages/index.js
 import { useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 
@@ -14,10 +13,10 @@ export default function Home() {
   }
 
   const models = [
-    { slug: "Akanksha17/healthcare-chronic-model", label: "Chronic Care" },
-    { slug: "Akanksha17/healthcare-postop-model", label: "Post-Op Care" },
-    { slug: "Akanksha17/healthcare-preop-model", label: "Pre-Op Care" },
-    { slug: "Akanksha17/healthcare-assisted-model", label: "Assisted Living" },
+    { slug: "Akanksha17/healthcare-chronic-model",    label: "Chronic Care" },
+    { slug: "Akanksha17/healthcare-postop-model",      label: "Post-Op Care" },
+    { slug: "Akanksha17/healthcare-preop-model",       label: "Pre-Op Care" },
+    { slug: "Akanksha17/healthcare-assisted-model",    label: "Assisted Living" },
   ];
 
   return (
