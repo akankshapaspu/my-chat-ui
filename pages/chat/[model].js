@@ -1,8 +1,7 @@
-// File: pages/chat/[model].js
 import { useRouter } from "next/router";
 import { useState, useEffect, useRef } from "react";
-import axios from "axios";
 
+// using fetch (so we don’t have to worry about Axios credentials option)
 export default function Chat() {
   const router = useRouter();
   const modelId = decodeURIComponent(router.query.model || "");
@@ -10,7 +9,6 @@ export default function Chat() {
   const [history, setHistory] = useState([]);
   const bottomRef = useRef();
 
-  // Scroll to bottom when history updates
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
@@ -20,17 +18,30 @@ export default function Chat() {
     setHistory((h) => [...h, { role: "user", text: prompt }]);
     setPrompt("");
     try {
-      const { data } = await axios.post("/api/chat", {
-        model: modelId,
-        prompt,
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",      // 🔑 include NextAuth session cookie
+        body: JSON.stringify({ model: modelId, prompt }),
       });
-      setHistory((h) => [...h, { role: "assistant", text: data.text }]);
+      const json = await res.json();
+      if (res.ok) {
+        setHistory((h) => [...h, { role: "assistant", text: json.text }]);
+      } else {
+        throw new Error(json.error || "Unknown error");
+      }
     } catch (err) {
-      setHistory((h) => [...h, { role: "assistant", text: "Error contacting model." }]);
+      setHistory((h) => [
+        ...h,
+        { role: "assistant", text: "Error contacting model." },
+      ]);
+      console.error("chat error:", err);
     }
   };
 
-  if (!modelId) return <p>Loading…</p>;
+  if (!modelId) {
+    return <p>Loading…</p>;
+  }
 
   return (
     <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
