@@ -1,7 +1,7 @@
-// File: pages/api/chat.js
 import { getSession } from "next-auth/react";
 
 export default async function handler(req, res) {
+  // only allow logged‐in users
   const session = await getSession({ req });
   if (!session) return res.status(401).json({ error: "Not signed in" });
 
