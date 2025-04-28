@@ -12,7 +12,7 @@
     "react-dom": "latest",
     "axios": "latest",
     "next-auth": "latest",
-    "nodemailer": "latest"
+    "nodemailer": "latest",
     "@next-auth/mongodb-adapter": "latest",
     "mongodb": "latest"
   }
