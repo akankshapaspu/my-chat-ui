@@ -1,17 +1,21 @@
 // pages/index.js
 
-import { useSession, signIn, signOut } from "next-auth/react";
+import { getSession, useSession, signIn, signOut } from "next-auth/react";
 import Link from "next/link";
 
 export default function Home() {
+  // Now useSession() will have pageProps.session from getServerSideProps
   const { data: session, status } = useSession();
 
   if (status === "loading") {
     return <p>Loading...</p>;
   }
-
   if (!session) {
-    return <button onClick={() => signIn()}>Sign in</button>;
+    return (
+      <div style={{ padding: 20 }}>
+        <button onClick={() => signIn()}>Sign in with Email</button>
+      </div>
+    );
   }
 
   const models = [
@@ -27,7 +31,6 @@ export default function Home() {
         Hi <strong>{session.user.email}</strong>!{" "}
         <button onClick={() => signOut()}>Sign out</button>
       </p>
-
       <h2>Select a chatbot:</h2>
       <ul>
         {models.map((m) => (
@@ -40,4 +43,12 @@ export default function Home() {
       </ul>
     </div>
   );
+}
+
+// This runs on every request, so useSession() never gets called at build time
+export async function getServerSideProps(context) {
+  const session = await getSession(context);
+  return {
+    props: { session },
+  };
 }
