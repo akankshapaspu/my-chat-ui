@@ -1,31 +1,26 @@
-import { getSession } from "next-auth/react";
+// pages/api/chat.js
+import { getServerSession } from "next-auth/next";
+import { authOptions }     from "./auth/[...nextauth]";
+import { HfInference }     from "@huggingface/inference";
+
+const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
 
 export default async function handler(req, res) {
-  // only allow logged‐in users
-  const session = await getSession({ req });
-  if (!session) return res.status(401).json({ error: "Not signed in" });
+  // ← this will read the same __Secure-next-auth.session-token cookie
+  const session = await getServerSession(req, res, authOptions);
+  if (!session) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   const { model, prompt } = req.body;
   try {
-    const hfRes = await fetch(
-      `https://api-inference.huggingface.co/models/${model}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: { max_new_tokens: 200 },
-        }),
-      }
-    );
-    const json = await hfRes.json();
-    if (json.error) throw new Error(json.error);
-    res.status(200).json({ text: json.generated_text });
-  } catch (err) {
-    console.error("❌ HF inference error", err);
-    res.status(500).json({ error: err.message });
+    const output = await hf.textGeneration({
+      model,
+      inputs: prompt,
+    });
+    return res.json({ text: output.generated_text });
+  } catch (e) {
+    console.error("HF error:", e);
+    return res.status(500).json({ error: "generation_error" });
   }
 }
