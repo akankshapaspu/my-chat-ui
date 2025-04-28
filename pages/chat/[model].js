@@ -1,69 +1,61 @@
-// File: pages/chat/[model].js
-
+// pages/chat/[model].js
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { useSession, signIn } from "next-auth/react";
+import { useSession } from "next-auth/react";
 
 export default function Chat() {
-  const router = useRouter();
   const { data: session, status } = useSession();
+  const router = useRouter();
   const modelId = decodeURIComponent(router.query.model || "");
 
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState([]);
 
-  // If not signed in, redirect to NextAuth’s sign-in page
+  // redirect to email‐magic‐link if logged out
   useEffect(() => {
     if (status === "unauthenticated") {
-      signIn(); // takes you to /api/auth/signin
+      window.location.href = "/api/auth/signin";
     }
   }, [status]);
 
-  if (status === "loading") {
-    return <div>Loading…</div>;
-  }
+  if (status === "loading") return <p>Loading…</p>;
+  if (!session) return null;
 
-  // Send the prompt to your HF endpoint, including the session cookie
   const send = async () => {
-    // Optimistically add the user message
-    setHistory([...history, { role: "user", text: prompt }]);
-
     try {
       const { data } = await axios.post(
         "/api/chat",
         { model: modelId, prompt },
-        {
-          withCredentials: true,      // ← here’s the critical bit
-        }
+        { withCredentials: true }  // ← ensure your session cookie goes with this call
       );
 
       setHistory((h) => [
         ...h,
-        { role: "bot", text: data.text || "No response from model." },
+        { role: "user", text: prompt },
+        { role: "bot",  text: data.text },
       ]);
-    } catch (err) {
-      console.error("chat error:", err);
+      setPrompt("");
+    } catch (e) {
+      console.error("send error", e);
       setHistory((h) => [
         ...h,
-        { role: "bot", text: "Error contacting model." },
+        { role: "user", text: prompt },
+        { role: "bot",  text: "Error contacting model." },
       ]);
     }
-
-    setPrompt("");
   };
 
   return (
     <div style={{ padding: 20 }}>
       <h1>Chatbot: {modelId}</h1>
-
       <div
         style={{
           border: "1px solid #ddd",
           padding: 10,
           height: 300,
-          overflowY: "auto",
-          marginBottom: 12,
+          overflow: "auto",
+          marginBottom: 8,
         }}
       >
         {history.map((m, i) => (
@@ -72,14 +64,11 @@ export default function Chat() {
           </p>
         ))}
       </div>
-
       <input
-        type="text"
+        style={{ width: "80%", marginRight: 8 }}
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && send()}
         placeholder="Type your question…"
-        style={{ width: "80%", marginRight: 8 }}
       />
       <button onClick={send}>Send</button>
     </div>
