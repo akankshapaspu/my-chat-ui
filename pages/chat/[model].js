@@ -1,74 +1,54 @@
 // pages/chat/[model].js
 import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
-import axios from "axios";
 import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 
-export default function Chat() {
+export default function ChatPage() {
+  const { query } = useRouter();
+  const model = query.model;
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const modelId = decodeURIComponent(router.query.model || "");
-
-  const [prompt, setPrompt] = useState("");
+  const [message, setMessage] = useState("");
   const [history, setHistory] = useState([]);
 
-  // redirect to email‐magic‐link if logged out
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      window.location.href = "/api/auth/signin";
-    }
-  }, [status]);
-
-  if (status === "loading") return <p>Loading…</p>;
-  if (!session) return null;
+  // you don't **have** to fetch /api/auth/session manually if you use useSession()
 
   const send = async () => {
-    try {
-      const { data } = await axios.post(
-        "/api/chat",
-        { model: modelId, prompt },
-        { withCredentials: true }  // ← ensure your session cookie goes with this call
-      );
+    if (!message) return;
+    setHistory((h) => [...h, { from: "user", text: message }]);
+    setMessage("");
 
-      setHistory((h) => [
-        ...h,
-        { role: "user", text: prompt },
-        { role: "bot",  text: data.text },
-      ]);
-      setPrompt("");
-    } catch (e) {
-      console.error("send error", e);
-      setHistory((h) => [
-        ...h,
-        { role: "user", text: prompt },
-        { role: "bot",  text: "Error contacting model." },
-      ]);
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",       // <— THIS IS CRITICAL
+      body: JSON.stringify({ model, message }),
+    });
+
+    if (!res.ok) {
+      setHistory((h) => [...h, { from: "bot", text: "Error contacting model." }]);
+      return;
     }
+    const { text } = await res.json();
+    setHistory((h) => [...h, { from: "bot", text }]);
   };
 
+  if (status === "loading") return <p>Loading…</p>;
+  if (!session) return <p>Please sign in to chat</p>;
+
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Chatbot: {modelId}</h1>
-      <div
-        style={{
-          border: "1px solid #ddd",
-          padding: 10,
-          height: 300,
-          overflow: "auto",
-          marginBottom: 8,
-        }}
-      >
+    <div>
+      <h1>Chatbot: {model}</h1>
+      <div style={{ border: "1px solid #ccc", padding: 8, minHeight: 200 }}>
         {history.map((m, i) => (
           <p key={i}>
-            <strong>{m.role}:</strong> {m.text}
+            <strong>{m.from}:</strong> {m.text}
           </p>
         ))}
       </div>
       <input
-        style={{ width: "80%", marginRight: 8 }}
-        value={prompt}
-        onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Type your question…"
+        style={{ width: "80%" }}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
       />
       <button onClick={send}>Send</button>
     </div>
