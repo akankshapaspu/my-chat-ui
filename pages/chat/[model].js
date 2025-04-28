@@ -1,58 +1,69 @@
-import { useRouter } from "next/router";
-import { useState, useEffect, useRef } from "react";
+// File: pages/chat/[model].js
 
-// using fetch (so we don’t have to worry about Axios credentials option)
+import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { useSession, signIn } from "next-auth/react";
+
 export default function Chat() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const modelId = decodeURIComponent(router.query.model || "");
+
   const [prompt, setPrompt] = useState("");
   const [history, setHistory] = useState([]);
-  const bottomRef = useRef();
 
+  // If not signed in, redirect to NextAuth’s sign-in page
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [history]);
-
-  const send = async () => {
-    if (!prompt.trim()) return;
-    setHistory((h) => [...h, { role: "user", text: prompt }]);
-    setPrompt("");
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",      // 🔑 include NextAuth session cookie
-        body: JSON.stringify({ model: modelId, prompt }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setHistory((h) => [...h, { role: "assistant", text: json.text }]);
-      } else {
-        throw new Error(json.error || "Unknown error");
-      }
-    } catch (err) {
-      setHistory((h) => [
-        ...h,
-        { role: "assistant", text: "Error contacting model." },
-      ]);
-      console.error("chat error:", err);
+    if (status === "unauthenticated") {
+      signIn(); // takes you to /api/auth/signin
     }
-  };
+  }, [status]);
 
-  if (!modelId) {
-    return <p>Loading…</p>;
+  if (status === "loading") {
+    return <div>Loading…</div>;
   }
 
+  // Send the prompt to your HF endpoint, including the session cookie
+  const send = async () => {
+    // Optimistically add the user message
+    setHistory([...history, { role: "user", text: prompt }]);
+
+    try {
+      const { data } = await axios.post(
+        "/api/chat",
+        { model: modelId, prompt },
+        {
+          withCredentials: true,      // ← here’s the critical bit
+        }
+      );
+
+      setHistory((h) => [
+        ...h,
+        { role: "bot", text: data.text || "No response from model." },
+      ]);
+    } catch (err) {
+      console.error("chat error:", err);
+      setHistory((h) => [
+        ...h,
+        { role: "bot", text: "Error contacting model." },
+      ]);
+    }
+
+    setPrompt("");
+  };
+
   return (
-    <div style={{ padding: 20, maxWidth: 600, margin: "0 auto" }}>
-      <h1>Chatbot: {modelId.split("/").pop()}</h1>
+    <div style={{ padding: 20 }}>
+      <h1>Chatbot: {modelId}</h1>
+
       <div
         style={{
           border: "1px solid #ddd",
           padding: 10,
-          height: 400,
+          height: 300,
           overflowY: "auto",
-          background: "#fafafa",
+          marginBottom: 12,
         }}
       >
         {history.map((m, i) => (
@@ -60,17 +71,17 @@ export default function Chat() {
             <strong>{m.role}:</strong> {m.text}
           </p>
         ))}
-        <div ref={bottomRef} />
       </div>
-      <div style={{ marginTop: 10 }}>
-        <input
-          style={{ width: "80%", marginRight: 8 }}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Type your question…"
-        />
-        <button onClick={send}>Send</button>
-      </div>
+
+      <input
+        type="text"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && send()}
+        placeholder="Type your question…"
+        style={{ width: "80%", marginRight: 8 }}
+      />
+      <button onClick={send}>Send</button>
     </div>
   );
 }
