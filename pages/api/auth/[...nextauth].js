@@ -40,12 +40,4 @@ export default NextAuth({
       session.user.id = token.sub;
       return session;
     },
-  },
-
-  // Optional: override the built-in verify pages
-  pages: {
-    signIn: "/api/auth/signin",
-    verifyRequest: "/api/auth/verify-request",
-    error: "/api/auth/error", 
-  },
-});
+  }
