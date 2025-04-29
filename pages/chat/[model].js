@@ -1,5 +1,5 @@
 // File: pages/chat/[model].js
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import axios from 'axios'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/router'
@@ -7,60 +7,83 @@ import { useRouter } from 'next/router'
 export default function ModelChat() {
   const { data: session } = useSession()
   const router = useRouter()
-  const { model } = router.query
+
+  // Decode the URL-encoded slug back into "owner/repo-name"
+  const { model: encoded } = router.query
+  const model = useMemo(() => {
+    if (!encoded) return ''
+    const raw = Array.isArray(encoded) ? encoded[0] : encoded
+    return decodeURIComponent(raw)
+  }, [encoded])
+
   const [messages, setMessages] = useState([])
 
   const send = async text => {
-    if (!session) return alert('Please sign in first')
+    if (!session) {
+      alert('Please sign in first')
+      return
+    }
     const newMsg = { role: 'user', content: text }
-    setMessages(m => [...m, newMsg])
+    setMessages(prev => [...prev, newMsg])
 
     try {
-      const { data } = await axios.post('/api/chat',
+      const { data } = await axios.post(
+        '/api/chat',
         { model, messages: [...messages, newMsg] },
         { withCredentials: true }
       )
-      setMessages(m => [...m, { role: 'assistant', content: data.reply }])
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: data.text }
+      ])
     } catch (err) {
       console.error(err)
-      setMessages(m => [...m, { role: 'assistant', content: 'Error contacting model.' }])
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: 'Error contacting model.' }
+      ])
     }
   }
 
-  const handleSubmit = e => {
-    e.preventDefault()
-    const text = e.target.elements.prompt.value
-    if (!text.trim()) return
-    send(text)
-    e.target.reset()
-  }
-
   return (
-    <div style={{ maxWidth: 800, margin: '2rem auto', fontFamily: 'sans-serif' }}>
-      <h1>🤖 Chatbot: {model}</h1>
+    <div style={{ padding: 20 }}>
+      <h1>🤖 Chatbot: {model || 'Loading…'}</h1>
 
-      <div style={{
-        border: '1px solid #ddd',
-        padding: '1rem',
-        minHeight: '300px',
-        background:'#fafafa'
-      }}>
+      <div
+        style={{
+          border: '1px solid #ccc',
+          padding: '1rem',
+          height: '60vh',
+          overflowY: 'auto',
+          marginBottom: '1rem'
+        }}
+      >
         {messages.map((m, i) => (
           <p key={i}>
-            <strong style={{ textTransform: 'capitalize' }}>{m.role}:</strong> {m.content}
+            <strong>
+              {m.role === 'user' ? 'User' : 'Assistant'}:
+            </strong>{' '}
+            {m.content}
           </p>
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', marginTop: '1rem' }}>
+      <form
+        onSubmit={e => {
+          e.preventDefault()
+          const text = e.target.elements.msg.value.trim()
+          if (text) {
+            send(text)
+            e.target.reset()
+          }
+        }}
+      >
         <input
-          name="prompt"
-          type="text"
+          name="msg"
           placeholder="Type your question…"
           style={{
-            flex: 1,
+            width: '80%',
             padding: '.5rem',
-            fontSize: '1rem',
             border: '1px solid #ccc',
             borderRadius: '4px 0 0 4px'
           }}
@@ -68,16 +91,17 @@ export default function ModelChat() {
         <button
           type="submit"
           style={{
-            padding: '0 .75rem',
-            fontSize: '1rem',
-            border: '1px solid #ccc',
-            borderLeft: 'none',
+            width: '18%',
+            padding: '.5rem',
+            border: '1px solid #0070f3',
             background: '#0070f3',
             color: 'white',
             borderRadius: '0 4px 4px 0',
             cursor: 'pointer'
           }}
-        >Send</button>
+        >
+          Send
+        </button>
       </form>
     </div>
   )
