@@ -7,14 +7,14 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
+    "@huggingface/inference": "latest",
+    "@next-auth/mongodb-adapter": "latest",
     "axios": "latest",
+    "mongodb": "latest",
+    "next": "latest",
     "next-auth": "latest",
     "nodemailer": "latest",
-    "@next-auth/mongodb-adapter": "latest",
-    "mongodb": "latest",
-    "@huggingface/inference": "latest"
+    "react": "latest",
+    "react-dom": "latest"
   }
 }
