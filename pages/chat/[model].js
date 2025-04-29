@@ -1,56 +1,51 @@
-// pages/chat/[model].js
-import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+// pages/api/chat/[...model].js
+import { NextApiRequest, NextApiResponse } from "next";
 
-export default function ChatPage() {
-  const { query } = useRouter();
-  const model = query.model;
-  const { data: session, status } = useSession();
-  const [message, setMessage] = useState("");
-  const [history, setHistory] = useState([]);
+export default async function handler(req, res) {
+  // 1️⃣ extract the slug array from the URL, e.g.
+  //    ["Akanksha17","healthcare-postop-model"]
+  const { model } = req.query;
+  const slug = Array.isArray(model) ? model.join("/") : model;
 
-  // you don't **have** to fetch /api/auth/session manually if you use useSession()
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Only POST allowed" });
+  }
 
-  const send = async () => {
-    if (!message) return;
-    setHistory((h) => [...h, { from: "user", text: message }]);
-    setMessage("");
+  const { message } = req.body;
+  if (!message) {
+    return res.status(400).json({ error: "No message provided" });
+  }
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",       // <— THIS IS CRITICAL
-      body: JSON.stringify({ model, message }),
-    });
+  try {
+    // 2️⃣ hit the shared HF Inference API with your single HF token
+    const hfRes = await fetch(
+      `https://api-inference.huggingface.co/models/${slug}`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inputs: message }),
+      }
+    );
 
-    if (!res.ok) {
-      setHistory((h) => [...h, { from: "bot", text: "Error contacting model." }]);
-      return;
+    if (!hfRes.ok) {
+      const err = await hfRes.json().catch(() => ({}));
+      return res
+        .status(hfRes.status)
+        .json({ error: err.error || "Model inference failed" });
     }
-    const { text } = await res.json();
-    setHistory((h) => [...h, { from: "bot", text }]);
-  };
 
-  if (status === "loading") return <p>Loading…</p>;
-  if (!session) return <p>Please sign in to chat</p>;
+    const data = await hfRes.json();
+    // most text models return [ { generated_text: "…" } ]
+    const text = Array.isArray(data)
+      ? data[0]?.generated_text
+      : data.generated_text || JSON.stringify(data);
 
-  return (
-    <div>
-      <h1>Chatbot: {model}</h1>
-      <div style={{ border: "1px solid #ccc", padding: 8, minHeight: 200 }}>
-        {history.map((m, i) => (
-          <p key={i}>
-            <strong>{m.from}:</strong> {m.text}
-          </p>
-        ))}
-      </div>
-      <input
-        style={{ width: "80%" }}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-      />
-      <button onClick={send}>Send</button>
-    </div>
-  );
+    return res.status(200).json({ text });
+  } catch (e) {
+    console.error("HuggingFace error:", e);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 }
