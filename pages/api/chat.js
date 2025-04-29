@@ -1,30 +1,35 @@
-// pages/api/chat.js
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "./auth/[...nextauth]";
-import { HfInference } from "@huggingface/inference";
-
-const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
+import { authOptions }     from "./auth/[...nextauth]";
+import { HfInference }      from "@huggingface/inference";
 
 export default async function handler(req, res) {
-  // 1) require a valid session
+  // 1) ensure only POST
+  if (req.method !== "POST") {
+    return res.setHeader("Allow", "POST").status(405).end();
+  }
+
+  // 2) verify user is signed in
   const session = await getServerSession(req, res, authOptions);
-  if (!session) return res.status(401).json({ error: "Unauthorized" });
+  if (!session) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
-  if (req.method !== "POST")
-    return res.status(405).json({ error: "Must POST" });
-
-  const { model, message } = req.body;
-  if (!model || !message)
-    return res.status(400).json({ error: "Missing model or message" });
+  const { model, question } = req.body;
+  if (!model || !question) {
+    return res.status(400).json({ error: "Missing model or question" });
+  }
 
   try {
+    const hf = new HfInference(process.env.HUGGINGFACE_API_KEY);
     const result = await hf.textGeneration({
       model,
-      inputs: message,
+      inputs: question,
+      parameters: { max_new_tokens: 128 },
     });
+
     return res.status(200).json({ text: result.generated_text });
-  } catch (error) {
-    console.error("HuggingFace error:", error);
-    return res.status(500).json({ error: "Error contacting model" });
+  } catch (e) {
+    console.error("❌ error calling HF:", e);
+    return res.status(500).json({ error: "Model request failed" });
   }
 }
