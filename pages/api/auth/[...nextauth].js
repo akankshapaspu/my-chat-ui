@@ -8,7 +8,7 @@ export default NextAuth({
   // Persist users/sessions & verification tokens to MongoDB
   adapter: MongoDBAdapter(clientPromise),
 
-  // Magic-link email sign-in
+  // Magic-link email provider
   providers: [
     EmailProvider({
       server: {
@@ -23,10 +23,10 @@ export default NextAuth({
     }),
   ],
 
-  // Must match your Vercel deployment URL exactly
+  // Used for encrypting tokens, must match Vercel’s NEXTAUTH_URL
   secret: process.env.NEXTAUTH_SECRET,
 
-  // Use JWT sessions (in cookie)
+  // Use JWT strategy
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -37,6 +37,5 @@ export default NextAuth({
       session.user.id = token.sub;
       return session;
     },
-  },           // ← trailing comma after callbacks
-
-});            // ← close NextAuth(…)
+  },              // ← **comma** here!
+});               // ← **close the NextAuth( … )** call
