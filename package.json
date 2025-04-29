@@ -15,6 +15,6 @@
     "nodemailer": "latest",
     "@next-auth/mongodb-adapter": "latest",
     "mongodb": "latest",
-    "@huggingface/inference": "latest"   ← **add this line**
+    "@huggingface/inference": "latest"
   }
 }
