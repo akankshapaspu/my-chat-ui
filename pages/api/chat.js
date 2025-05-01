@@ -1,62 +1,41 @@
-// File: pages/api/chat.js
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from './auth/[...nextauth]'
-import { HfInference } from '@huggingface/inference'
+// File: /pages/api/chat.js
+
+import { getSession } from "next-auth/react";
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST')
-    return res.status(405).end()
-  }
-
-  // Ensure user is signed in
-  const session = await getServerSession(req, res, authOptions)
+  // 1) must be signed in
+  const session = await getSession({ req });
   if (!session) {
-    return res.status(401).json({ error: 'Unauthorized' })
+    return res.status(401).json({ error: "Not signed in" });
   }
 
-  const { model, messages } = req.body
-  if (!model || !Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'Missing model or messages' })
+  // 2) pull the care‐option (one of "preop","postop","chronic","assisted")
+  const { care, prompt } = req.body;
+  if (!care || !prompt) {
+    return res.status(400).json({ error: "Missing care or prompt" });
   }
 
-  console.log('🛰️ Chat request for model:', model)
-
-  try {
-    const hf = new HfInference(process.env.HUGGINGFACE_API_KEY)
-
-    // 1) Retrieve relevant docs (replace fakeRetrieve with your vector-DB call)
-    const lastUser = messages[messages.length - 1].content
-    const docs = await fakeRetrieve(lastUser)        // => [ "doc1…", "doc2…" ]
-    const context = docs.join('\n\n')
-
-    // 2) Build RAG prompt
-    const prompt = `
-You are a ${model} RAG assistant.
-
-Context:
-${context}
-
-Question:
-${lastUser}
-`
-
-    // 3) Generate
-    const result = await hf.textGeneration({
-      model,
+  // 3) forward to your single HF inference endpoint,
+  //    passing the care‐option as a path or body param
+  const hfRes = await fetch(`${process.env.HF_INFERENCE_URL}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      // either your endpoint expects model= or route‐prefix,
+      // adjust to what your endpoint needs:
+      model: care,
       inputs: prompt,
-      parameters: { max_new_tokens: 256, temperature: 0.7 }
-    })
+    }),
+  });
 
-    return res.status(200).json({ text: result.generated_text })
-  } catch (e) {
-    console.error('❌ error calling HF:', e)
-    return res.status(500).json({ error: 'Model request failed' })
+  if (!hfRes.ok) {
+    const text = await hfRes.text();
+    return res.status(500).json({ error: text });
   }
-}
-
-// Stub—swap in your real vector store retrieval logic
-async function fakeRetrieve(query) {
-  // e.g. Pinecone, Weaviate, etc.
-  return [`<Here would be your retrieved snippet for "${query}">`]
+  const json = await hfRes.json();
+  // assume json.generated_text
+  return res.status(200).json({ text: json.generated_text });
 }
