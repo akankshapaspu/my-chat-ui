@@ -1,36 +1,33 @@
-import { useSession, signIn, signOut } from "next-auth/react";
+// File: /pages/index.js
 import Link from "next/link";
+import { useSession, signIn } from "next-auth/react";
 
 export default function Home() {
   const { data: session } = useSession();
-
   if (!session) {
     return (
-      <div style={{ padding: 20 }}>
-        <button onClick={() => signIn()}>Sign in with Email</button>
+      <div>
+        <p>You must sign in first</p>
+        <button onClick={() => signIn("email")}>Sign in</button>
       </div>
     );
   }
 
-  const models = [
-    { slug: "Akanksha17/healthcare-chronic-model", label: "Chronic Care" },
-    { slug: "Akanksha17/healthcare-postop-model",   label: "Post-Op Care" },
-    { slug: "Akanksha17/healthcare-preop-model",    label: "Pre-Op Care" },
-    { slug: "Akanksha17/healthcare-assisted-model", label: "Assisted Living" },
+  const options = [
+    ["preop", "Pre-operative care instructions"],
+    ["postop", "Post-operative instructions"],
+    ["chronic", "Chronic Care Management"],
+    ["assisted", "Assisted Living Plan"],
   ];
 
   return (
-    <div style={{ padding: 20 }}>
-      <p>
-        Signed in as <strong>{session.user.email}</strong>{" "}
-        <button onClick={() => signOut()}>Sign out</button>
-      </p>
-      <h2>Select a chatbot:</h2>
+    <div>
+      <h1>Choose your care chatbot</h1>
       <ul>
-        {models.map((m) => (
-          <li key={m.slug} style={{ margin: "8px 0" }}>
-            <Link href={`/chat/${encodeURIComponent(m.slug)}`}>
-              <a>{m.label}</a>
+        {options.map(([key, label]) => (
+          <li key={key}>
+            <Link href={`/chat/${key}`}>
+              <a>{label}</a>
             </Link>
           </li>
         ))}
