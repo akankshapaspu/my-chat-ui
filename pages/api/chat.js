@@ -1,27 +1,22 @@
+// pages/api/chat.js
 import { getSession } from "next-auth/react";
 
 export default async function handler(req, res) {
+  if (req.method !== "POST") return res.status(405).end();
   const session = await getSession({ req });
-  if (!session) {
-    return res.status(401).json({ error: "Not signed in" });
-  }
+  if (!session) return res.status(401).json({ error: "Not signed in" });
 
   const { care, prompt } = req.body;
-  if (!care || !prompt) {
-    return res.status(400).json({ error: "Missing care or prompt" });
-  }
+  if (!care || !prompt) return res.status(400).json({ error: "Missing care or prompt" });
 
   try {
     const hfRes = await fetch(process.env.HF_INFERENCE_URL, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
         "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
       },
-      body: JSON.stringify({
-        model: care,
-        inputs: prompt,
-      }),
+      body: JSON.stringify({ model: care, inputs: prompt }),
     });
 
     if (!hfRes.ok) {
